@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Админ-панель</title>
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    body { 
+      background: #121212; 
+      font-family: 'Rubik', sans-serif; 
+      color: white; 
+      margin: 0; 
+      user-select: none; 
+    }
+    header { 
+      background: #1c1c2b; 
+      padding: 20px; 
+      text-align: center; 
+      font-weight: bold; 
+      font-size: 24px; 
+      border-bottom: 1px solid #333; 
+    }
+    .section { 
+      padding: 20px; 
+      max-width: 1000px; 
+      margin: auto; 
+    }
+    .nav { 
+      text-align: center; 
+      margin: 25px; 
+      padding: 15px;
+      background: #1c1c2b;
+      border-radius: 12px;
+    }
+    .nav-link {
+      color: #4e70ff;
+      cursor: pointer;
+      font-weight: bold;
+      margin: 0 20px;
+      user-select: none;
+      text-decoration: none;
+      font-size: 18px;
+      padding: 10px 15px;
+      border-radius: 8px;
+      transition: all 0.3s;
+    }
+    .nav-link:hover { 
+      text-decoration: underline;
+      background: rgba(78, 112, 255, 0.15);
+    }
+    .admin-form { 
+      background: #20202f; 
+      padding: 25px; 
+      border-radius: 15px; 
+      margin: 25px 0; 
+      box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+    }
+    .admin-form h3 {
+      margin-top: 0;
+      color: #4e70ff;
+      border-bottom: 2px solid #4e70ff;
+      padding-bottom: 10px;
+    }
+    .admin-form input, 
+    .admin-form select,
+    .admin-form textarea { 
+      width: 100%; 
+      padding: 12px 15px; 
+      margin: 10px 0; 
+      border-radius: 8px; 
+      border: 2px solid #333; 
+      background: #1c1c2b; 
+      color: white; 
+      font-size: 16px;
+      box-sizing: border-box;
+    }
+    .admin-form input:focus,
+    .admin-form select:focus,
+    .admin-form textarea:focus {
+      border-color: #4e70ff;
+      outline: none;
+    }
+    .admin-form button { 
+      background: linear-gradient(135deg, #4e70ff, #8a2be2); 
+      color: white; 
+      border: none; 
+      padding: 15px 25px; 
+      border-radius: 10px; 
+      cursor: pointer; 
+      font-weight: bold; 
+      margin-top: 15px; 
+      font-size: 16px;
+      width: 100%;
+      transition: transform 0.2s;
+    }
+    .admin-form button:hover {
+      transform: scale(1.02);
+    }
+    .gifts-grid { 
+      display: grid; 
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
+      gap: 20px; 
+      margin: 30px 0; 
+    }
+    .gift-card { 
+      background: #2a2a3a; 
+      border-radius: 12px; 
+      padding: 15px; 
+      text-align: center; 
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    }
+    .gift-card img { 
+      width: 80px; 
+      height: 80px; 
+      object-fit: cover; 
+      border-radius: 8px;
+      margin-bottom: 10px;
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin: 20px 0;
+    }
+    .stat-card {
+      background: linear-gradient(135deg, #2a2a3a, #1c1c2b);
+      padding: 20px;
+      border-radius: 10px;
+      text-align: center;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
+    .stat-number {
+      font-size: 24px;
+      font-weight: bold;
+      color: #4e70ff;
+      margin: 10px 0;
+    }
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+    }
+    @media (max-width: 768px) {
+      .form-row {
+        grid-template-columns: 1fr;
+      }
+    }
+    .success-message {
+      background: #4caf50;
+      color: white;
+      padding: 10px;
+      border-radius: 5px;
+      margin: 10px 0;
+      text-align: center;
+      display: none;
+    }
+    .error-message {
+      background: #f44336;
+      color: white;
+      padding: 10px;
+      border-radius: 5px;
+      margin: 10px 0;
+      text-align: center;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>⚙️ Админ-панель</h1>
+    <div style="color: #888; margin-top: 10px;">Управление системой подарков</div>
+  </header>
+  
+  <div class="nav">
+    <span class="nav-link" onclick="go('/profile')">📱 Профиль</span>
+    <span class="nav-link" onclick="go('/admin')">⚙️ Админ-панель</span>
+  </div>
+
+  <div class="section">
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div>👥 Пользователей</div>
+        <div class="stat-number">{{ users_count }}</div>
+      </div>
+      <div class="stat-card">
+        <div>🎁 Подарков</div>
+        <div class="stat-number">{{ gifts_count }}</div>
+      </div>
+      <div class="stat-card">
+        <div>🔄 Улучшений</div>
+        <div class="stat-number">{{ upgrades_count }}</div>
+      </div>
+      <div class="stat-card">
+        <div>🏪 На маркете</div>
+        <div class="stat-number">{{ market_count }}</div>
+      </div>
+    </div>
+
+    <div class="admin-form">
+      <h3>📦 Добавить новый подарок</h3>
+      <div class="form-row">
+        <input type="text" id="gift-name" placeholder="Название подарка" required>
+        <input type="number" id="gift-stock" placeholder="Количество" min="0" required>
+      </div>
+      <div class="form-row">
+        <input type="number" id="gift-price" placeholder="Цена" min="1" required>
+        <input type="text" id="gift-image" placeholder="URL изображения" required>
+      </div>
+      <div class="form-row">
+        <input type="number" id="gift-collection" placeholder="Номер коллекции" min="1" required>
+        <select id="gift-upgradable" required>
+          <option value="0">❌ Не улучшаемый</option>
+          <option value="1">✅ Улучшаемый</option>
+        </select>
+      </div>
+      <button onclick="addGift()">➕ Добавить подарок</button>
+      <div id="gift-message" class="success-message"></div>
+    </div>
+
+    <div class="admin-form">
+      <h3>🔄 Добавить улучшение</h3>
+      <select id="upgrade-gift-id" required>
+        <option value="">Выберите подарок для улучшения</option>
+        {% for gift in gifts %}
+        <option value="{{ gift.gift_id }}">{{ gift.name }} (#{{ gift.collection_number }})</option>
+        {% endfor %}
+      </select>
+      <input type="text" id="upgrade-name" placeholder="Название улучшения" required>
+      <div class="form-row">
+        <input type="text" id="upgrade-image" placeholder="URL изображения улучшения" required>
+        <input type="number" id="upgrade-price" placeholder="Цена улучшения" min="1" required>
+      </div>
+      <button onclick="addUpgrade()">➕ Добавить улучшение</button>
+      <div id="upgrade-message" class="success-message"></div>
+    </div>
+
+    <div class="admin-form">
+      <h3>🎁 Выдать подарок пользователю</h3>
+      <input type="text" id="user-id" placeholder="User ID пользователя" required>
+      <div class="form-row">
+        <select id="gift-to-give" required>
+          <option value="">Выберите подарок</option>
+          {% for gift in gifts %}
+          <option value="{{ gift.gift_id }}">{{ gift.name }} (#{{ gift.collection_number }})</option>
+          {% endfor %}
+        </select>
+        <input type="number" id="gift-quantity" placeholder="Количество" value="1" min="1" required>
+      </div>
+      <button onclick="giveGift()">🎁 Выдать подарок</button>
+      <div id="give-message" class="success-message"></div>
+    </div>
+
+    <h3 style="text-align: center; margin: 40px 0 20px;">📊 Все подарки в системе</h3>
+    
+    {% if gifts %}
+    <div class="gifts-grid">
+      {% for gift in gifts %}
+      <div class="gift-card">
+        <img src="{{ gift.image }}" 
+             onerror="this.src='https://via.placeholder.com/80/2a2a3a/ffffff?text=🎁'" 
+             alt="{{ gift.name }}">
+        <div style="font-weight: bold; font-size: 14px; margin: 8px 0;">{{ gift.name }}</div>
+        <div style="color: #ffda44; font-size: 12px;">Коллекция #{{ gift.collection_number }}</div>
+        <div style="color: #4e70ff; font-size: 14px; margin: 5px 0;">⭐ {{ gift.price }}</div>
+        <div style="color: #888; font-size: 12px;">Остаток: {{ gift.stock }}</div>
+        <div style="color: {% if gift.can_upgrade %}#4caf50{% else %}#f44336{% endif %}; font-size: 12px;">
+          {% if gift.can_upgrade %}✅ Улучшаемый{% else %}❌ Не улучшаемый{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div style="text-align: center; color: #888; font-size: 18px; margin: 40px 0;">
+      <div style="font-size: 48px; margin-bottom: 20px;">📦</div>
+      <div>Подарков пока нет в системе</div>
+    </div>
+    {% endif %}
+  </div>
+
+  <script>
+    const userId = "{{ user.id }}";
+    
+    function go(path) {
+      window.location.href = path + "?id=" + userId;
+    }
+
+    function showMessage(elementId, message, isError = false) {
+      const element = document.getElementById(elementId);
+      element.textContent = message;
+      element.style.display = 'block';
+      element.className = isError ? 'error-message' : 'success-message';
+      
+      setTimeout(() => {
+        element.style.display = 'none';
+      }, 5000);
+    }
+
+    function addGift() {
+      const gift = {
+        name: document.getElementById('gift-name').value,
+        stock: parseInt(document.getElementById('gift-stock').value),
+        price: parseInt(document.getElementById('gift-price').value),
+        image: document.getElementById('gift-image').value,
+        collection_number: parseInt(document.getElementById('gift-collection').value),
+        can_upgrade: parseInt(document.getElementById('gift-upgradable').value)
+      };
+
+      if (!gift.name || gift.stock < 0 || gift.price < 1 || !gift.image || gift.collection_number < 1) {
+        showMessage('gift-message', '❌ Заполните все поля корректно', true);
+        return;
+      }
+
+      fetch('/admin/add_gift', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(gift)
+      })
+      .then(r => r.json())
+      .then(data => {
+        showMessage('gift-message', data.msg, !data.success);
+        if (data.success) {
+          setTimeout(() => location.reload(), 2000);
+        }
+      })
+      .catch(error => {
+        showMessage('gift-message', '❌ Ошибка при добавлении подарка', true);
+      });
+    }
+
+    function addUpgrade() {
+      const upgrade = {
+        gift_id: parseInt(document.getElementById('upgrade-gift-id').value),
+        name: document.getElementById('upgrade-name').value,
+        image: document.getElementById('upgrade-image').value,
+        price: parseInt(document.getElementById('upgrade-price').value)
+      };
+
+      if (!upgrade.gift_id || !upgrade.name || !upgrade.image || upgrade.price < 1) {
+        showMessage('upgrade-message', '❌ Заполните все поля корректно', true);
+        return;
+      }
+
+      fetch('/admin/add_upgrade', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(upgrade)
+      })
+      .then(r => r.json())
+      .then(data => {
+        showMessage('upgrade-message', data.msg, !data.success);
+        if (data.success) {
+          setTimeout(() => location.reload(), 2000);
+        }
+      })
+      .catch(error => {
+        showMessage('upgrade-message', '❌ Ошибка при добавлении улучшения', true);
+      });
+    }
+
+    function giveGift() {
+      const data = {
+        user_id: document.getElementById('user-id').value,
+        gift_id: parseInt(document.getElementById('gift-to-give').value),
+        quantity: parseInt(document.getElementById('gift-quantity').value)
+      };
+
+      if (!data.user_id || !data.gift_id || data.quantity < 1) {
+        showMessage('give-message', '❌ Заполните все поля корректно', true);
+        return;
+      }
+
+      fetch('/admin/give_gift', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      })
+      .then(r => r.json())
+      .then(data => {
+        showMessage('give-message', data.msg, !data.success);
+      })
+      .catch(error => {
+        showMessage('give-message', '❌ Ошибка при выдаче подарка', true);
+      });
+    }
+
+    // Авто-фокус на первое поле
+    document.getElementById('gift-name').focus();
+  </script>
+</body>
+</html>
