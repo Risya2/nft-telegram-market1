@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Магазин подарков</title>
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    body { 
+      background: #121212; 
+      font-family: 'Rubik', sans-serif; 
+      color: white; 
+      margin: 0; 
+      user-select: none; 
+    }
+    header { 
+      background: #1c1c2b; 
+      padding: 20px; 
+      text-align: center; 
+      font-weight: bold; 
+      font-size: 24px; 
+      border-bottom: 1px solid #333; 
+    }
+    .section { 
+      padding: 20px; 
+      max-width: 1200px; 
+      margin: auto; 
+    }
+    .balance { 
+      font-size: 20px; 
+      color: #ffda44; 
+      margin-bottom: 30px; 
+      text-align: center;
+      padding: 15px;
+      background: rgba(255, 218, 68, 0.1);
+      border-radius: 10px;
+    }
+    .gifts-grid { 
+      display: grid; 
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
+      gap: 20px; 
+      margin-top: 30px;
+    }
+    .gift-card { 
+      background: #20202f; 
+      border-radius: 15px; 
+      padding: 20px; 
+      text-align: center; 
+      box-shadow: 0 8px 20px rgba(0,0,0,0.3); 
+      transition: all 0.3s ease;
+      border: 2px solid transparent;
+    }
+    .gift-card:hover {
+      transform: translateY(-5px);
+      border-color: #4e70ff;
+      box-shadow: 0 12px 30px rgba(78, 112, 255, 0.2);
+    }
+    .gift-card img { 
+      width: 120px; 
+      height: 120px; 
+      object-fit: cover; 
+      border-radius: 10px;
+      margin-bottom: 15px;
+    }
+    .gift-card button { 
+      margin-top: 15px; 
+      background: linear-gradient(135deg, #4e70ff, #8a2be2); 
+      color: white; 
+      border: none; 
+      padding: 12px 20px; 
+      border-radius: 10px; 
+      cursor: pointer; 
+      font-size: 16px; 
+      font-weight: bold;
+      width: 100%;
+      transition: transform 0.2s;
+    }
+    .gift-card button:hover {
+      transform: scale(1.05);
+    }
+    .gift-card button:disabled {
+      background: #666;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .nav { 
+      text-align: center; 
+      margin: 25px; 
+      padding: 15px;
+      background: #1c1c2b;
+      border-radius: 12px;
+    }
+    .nav-link {
+      color: #4e70ff;
+      cursor: pointer;
+      font-weight: bold;
+      margin: 0 20px;
+      user-select: none;
+      text-decoration: none;
+      font-size: 18px;
+      padding: 10px 15px;
+      border-radius: 8px;
+      transition: all 0.3s;
+    }
+    .nav-link:hover { 
+      text-decoration: underline;
+      background: rgba(78, 112, 255, 0.15);
+    }
+    .collection-badge { 
+      background: linear-gradient(135deg, #ffda44, #ffb347); 
+      color: black; 
+      padding: 5px 10px; 
+      border-radius: 15px; 
+      font-size: 12px; 
+      margin: 10px 0; 
+      font-weight: bold;
+    }
+    .price-tag {
+      font-size: 18px;
+      color: #ffda44;
+      font-weight: bold;
+      margin: 10px 0;
+    }
+    .stock-info {
+      font-size: 14px;
+      color: #888;
+      margin: 5px 0;
+    }
+    .search-filter {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 30px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .search-filter input,
+    .search-filter select {
+      padding: 12px 15px;
+      border-radius: 8px;
+      border: 2px solid #333;
+      background: #1c1c2b;
+      color: white;
+      font-size: 16px;
+      min-width: 200px;
+    }
+    .category-filter {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      margin: 20px 0;
+      flex-wrap: wrap;
+    }
+    .category-btn {
+      padding: 8px 16px;
+      border-radius: 20px;
+      background: #333;
+      color: white;
+      border: none;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    .category-btn.active {
+      background: #4e70ff;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🛒 Магазин подарков</h1>
+    <div class="balance">⭐ Ваш баланс: {{ user.balance }}</div>
+  </header>
+  
+  <div class="nav">
+    <span class="nav-link" onclick="go('/profile')">📱 Профиль</span>
+    <span class="nav-link" onclick="go('/shop')">🛒 Магазин</span>
+    <span class="nav-link" onclick="go('/market')">🏪 Маркет</span>
+    {% if user.is_admin %}
+    <span class="nav-link" onclick="go('/admin')">⚙️ Админ-панель</span>
+    {% endif %}
+  </div>
+
+  <div class="section">
+    <div class="search-filter">
+      <input type="text" id="searchInput" placeholder="🔍 Поиск подарков..." oninput="filterGifts()">
+      <select id="sortSelect" onchange="filterGifts()">
+        <option value="price-asc">Цена ↑</option>
+        <option value="price-desc">Цена ↓</option>
+        <option value="name">По названию</option>
+        <option value="collection">По коллекции</option>
+      </select>
+    </div>
+
+    <div class="category-filter">
+      <button class="category-btn active" onclick="setCategory('all')">Все</button>
+      <button class="category-btn" onclick="setCategory('available')">В наличии</button>
+      <button class="category-btn" onclick="setCategory('upgradable')">Улучшаемые</button>
+    </div>
+
+    <h3 style="text-align: center; margin-bottom: 30px;">🎁 Доступные подарки</h3>
+    
+    {% if gifts %}
+    <div class="gifts-grid" id="giftsContainer">
+      {% for gift in gifts %}
+      <div class="gift-card" data-name="{{ gift.name.lower() }}" 
+           data-price="{{ gift.price }}" data-collection="{{ gift.collection_number }}"
+           data-stock="{{ gift.stock }}" data-upgradable="{{ gift.can_upgrade }}">
+        <img src="{{ gift.image }}" 
+             onerror="this.src='https://via.placeholder.com/120/20202f/ffffff?text=🎁'" 
+             alt="{{ gift.name }}">
+        <div style="font-weight: bold; font-size: 16px; margin: 10px 0;">{{ gift.name }}</div>
+        <div class="collection-badge">Коллекция #{{ gift.collection_number }}</div>
+        <div class="price-tag">⭐ {{ gift.price }}</div>
+        <div class="stock-info">В наличии: {{ gift.stock }} шт.</div>
+        <div class="stock-info" style="color: {% if gift.can_upgrade %}#4caf50{% else %}#888{% endif %};">
+          {% if gift.can_upgrade %}✅ Улучшаемый{% else %}❌ Не улучшаемый{% endif %}
+        </div>
+        
+        <button onclick="buyGift({{ gift.gift_id }})" 
+                {% if gift.stock <= 0 or user.balance < gift.price %}disabled{% endif %}>
+          {% if gift.stock <= 0 %}❌ Нет в наличии
+          {% elif user.balance < gift.price %}❌ Не хватает
+          {% else %}🛒 Купить
+          {% endif %}
+        </button>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div style="text-align: center; color: #888; font-size: 18px; margin: 50px 0;">
+      <div style="font-size: 48px; margin-bottom: 20px;">😢</div>
+      <div>Подарков пока нет в магазине</div>
+    </div>
+    {% endif %}
+  </div>
+
+  <script>
+    const userId = "{{ user.id }}";
+    let currentCategory = 'all';
+    
+    function go(path) {
+      window.location.href = path + "?id=" + userId;
+    }
+
+    function buyGift(giftId) {
+      if (confirm('Подтвердите покупку этого подарка?')) {
+        fetch(`/buy/${giftId}?id=${userId}`, { method: 'POST' })
+          .then(r => r.json())
+          .then(data => {
+            alert(data.msg);
+            if (data.success) {
+              setTimeout(() => location.reload(), 1000);
+            }
+          })
+          .catch(error => {
+            alert('Ошибка при покупке подарка');
+          });
+      }
+    }
+
+    function filterGifts() {
+      const searchText = document.getElementById('searchInput').value.toLowerCase();
+      const sortBy = document.getElementById('sortSelect').value;
+      const gifts = document.querySelectorAll('.gift-card');
+      
+      gifts.forEach(gift => {
+        const name = gift.dataset.name;
+        const stock = parseInt(gift.dataset.stock);
+        const upgradable = gift.dataset.upgradable === '1';
+        
+        let visible = true;
+        
+        // Фильтр по категории
+        if (currentCategory === 'available' && stock <= 0) visible = false;
+        if (currentCategory === 'upgradable' && !upgradable) visible = false;
+        
+        // Фильтр по поиску
+        if (searchText && !name.includes(searchText)) visible = false;
+        
+        gift.style.display = visible ? 'block' : 'none';
+      });
+
+      // Сортировка
+      const container = document.getElementById('giftsContainer');
+      const sortedGifts = Array.from(gifts).filter(g => g.style.display !== 'none');
+      
+      sortedGifts.sort((a, b) => {
+        switch(sortBy) {
+          case 'price-asc':
+            return parseInt(a.dataset.price) - parseInt(b.dataset.price);
+          case 'price-desc':
+            return parseInt(b.dataset.price) - parseInt(a.dataset.price);
+          case 'name':
+            return a.dataset.name.localeCompare(b.dataset.name);
+          case 'collection':
+            return parseInt(a.dataset.collection) - parseInt(b.dataset.collection);
+          default:
+            return 0;
+        }
+      });
+
+      sortedGifts.forEach(gift => container.appendChild(gift));
+    }
+
+    function setCategory(category) {
+      currentCategory = category;
+      document.querySelectorAll('.category-btn').forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+      filterGifts();
+    }
+
+    // Авто-фокус на поиск
+    document.getElementById('searchInput').focus();
+  </script>
+</body>
+</html>
