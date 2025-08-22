@@ -9,7 +9,7 @@ from datetime import datetime
 import time
 
 BOT_TOKEN = '2201679657:AAFNqDQGuIG0BtKP6M3EPVHKJSYv6Wf2JwI/test'
-DOMAIN = 'http://127.0.0.1:5000'
+DOMAIN = ' https://risya2.github.io/nft-telegram-market1/'
 PORT = 5000
 START_BALANCE = 10_000_000
 DB_FILE = 'database.sqlite3'
