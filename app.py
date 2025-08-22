@@ -9,7 +9,7 @@ from datetime import datetime
 import time
 
 BOT_TOKEN = '2201679657:AAFNqDQGuIG0BtKP6M3EPVHKJSYv6Wf2JwI/test'
-DOMAIN = ' https://risya2.github.io/nft-telegram-market1/'
+DOMAIN = 'http://127.0.0.1:5000'
 PORT = 5000
 START_BALANCE = 10_000_000
 DB_FILE = 'database.sqlite3'
@@ -17,6 +17,18 @@ ADMIN_ID = '2200193476'  # Замените на ваш Telegram ID
 
 app = Flask(__name__)
 bot = TeleBot(BOT_TOKEN)
+
+# --- УТИЛИТЫ ---
+def generate_uid():
+    return ''.join(random.choices(string.ascii_letters + string.digits, k=16))
+
+def is_admin(user_id):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT is_admin FROM users WHERE user_id = ?", (user_id,))
+    user = c.fetchone()
+    conn.close()
+    return user and user['is_admin'] == 1
 
 # --- ИНИЦИАЛИЗАЦИЯ БАЗЫ ---
 def get_db():
@@ -94,18 +106,6 @@ def init_db():
 
 init_db()
 
-# --- УТИЛИТЫ ---
-def generate_uid():
-    return ''.join(random.choices(string.ascii_letters + string.digits, k=16))
-
-def is_admin(user_id):
-    conn = get_db()
-    c = conn.cursor()
-    c.execute("SELECT is_admin FROM users WHERE user_id = ?", (user_id,))
-    user = c.fetchone()
-    conn.close()
-    return user and user['is_admin'] == 1
-
 # --- Проверка Referer и User-Agent и IP ---
 @app.before_request
 def block_illegal_post_and_ip():
@@ -113,8 +113,7 @@ def block_illegal_post_and_ip():
         referer = request.headers.get('Referer', '')
         user_agent = request.headers.get('User-Agent', '').lower()
         if not referer.startswith(DOMAIN):
-            while True:
-                time.sleep(100000)
+            abort(403, "Доступ запрещён")
 
     host = request.host.split(':')[0]
     def is_ip(s):
@@ -154,6 +153,14 @@ def get_all_gifts():
     conn.close()
     return gifts
 
+def get_gift_by_id(gift_id):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT * FROM gifts WHERE gift_id = ?", (gift_id,))
+    gift = c.fetchone()
+    conn.close()
+    return gift
+
 def get_gift_upgrades(gift_id):
     conn = get_db()
     c = conn.cursor()
@@ -169,6 +176,14 @@ def get_user_gifts(user_id):
     gifts = c.fetchall()
     conn.close()
     return gifts
+
+def get_user_gift_by_id(gift_id):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT * FROM user_gifts WHERE id = ?", (gift_id,))
+    gift = c.fetchone()
+    conn.close()
+    return gift
 
 def gift_to_dict(row):
     return {
@@ -287,16 +302,16 @@ PROFILE_HTML = '''<!DOCTYPE html>
     <div class="gifts-grid">
       {% for g in user.gifts %}
       <div class="gift-card">
-        <img src="{{ g.image }}">
+        <img src="{{ g.image }}" onerror="this.src='https://via.placeholder.com/100?text=Image+Error'">
         <div><b>{{ g.name }}</b></div>
         <div class="collection-badge">Коллекционный #{{ g.collection_number }}</div>
-        <div style="font-size:12px; color:gray;">ID: {{ loop.index0 }}<br>{{ g.date }}</div>
+        <div style="font-size:12px; color:gray;">ID: {{ g.id }}<br>{{ g.date }}</div>
 
         {% if not g.updated %}
-          <button onclick="upgrade({{ loop.index0 }})">Обновить</button>
+          <button onclick="upgrade({{ g.id }})">Обновить</button>
         {% else %}
           <div style="font-size:12px; color:lightgreen;">Обновлено</div>
-          <button onclick="sellToMarket({{ loop.index0 }})">Продать в маркет</button>
+          <button onclick="sellToMarket({{ g.id }})">Продать в маркет</button>
         {% endif %}
 
       </div>
@@ -318,7 +333,7 @@ PROFILE_HTML = '''<!DOCTYPE html>
         .then(r => r.json())
         .then(data => {
           alert(data.msg);
-          if (data.msg === 'Обновлено') location.reload();
+          if (data.success) location.reload();
         });
     }
 
@@ -334,7 +349,161 @@ PROFILE_HTML = '''<!DOCTYPE html>
         .then(r => r.json())
         .then(data => {
           alert(data.msg);
-          if (data.msg === 'Выставлено на маркет') location.reload();
+          if (data.success) location.reload();
+        });
+    }
+  </script>
+</body>
+</html>
+'''
+
+SHOP_HTML = '''<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Магазин подарков</title>
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    body { background: #121212; font-family: 'Rubik', sans-serif; color: white; margin: 0; user-select: none; }
+    header { background: #1c1c2b; padding: 16px; text-align: center; font-weight: bold; font-size: 22px; border-bottom: 1px solid #333; }
+    .section { padding: 20px; max-width: 900px; margin: auto; }
+    .balance { font-size: 20px; color: #ffda44; margin-bottom: 20px; }
+    .gifts-grid { display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; }
+    .gift-card { background: #20202f; border-radius: 12px; padding: 16px; width: 160px; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.4); }
+    .gift-card img { width: 100px; height: 100px; object-fit: cover; }
+    .gift-card button { margin-top: 8px; background: #4e70ff; color: white; border: none; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 14px; }
+    .nav { text-align: center; margin: 20px; }
+    .nav-link {
+      color: #4e70ff;
+      cursor: pointer;
+      font-weight: bold;
+      margin: 0 10px;
+      user-select: none;
+      text-decoration: none;
+    }
+    .nav-link:hover { text-decoration: underline; }
+    .collection-badge { background: gold; color: black; padding: 2px 6px; border-radius: 8px; font-size: 10px; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <header>Магазин подарков — ⭐ {{ user.balance }}</header>
+  <div class="nav">
+    <span class="nav-link" onclick="go('/profile')">Профиль</span> |
+    <span class="nav-link" onclick="go('/shop')">Магазин</span> |
+    <span class="nav-link" onclick="go('/market')">Маркет</span>
+    {% if user.is_admin %}
+    | <span class="nav-link" onclick="go('/admin')">Админ-панель</span>
+    {% endif %}
+  </div>
+  <div class="section">
+    <h3>Доступные подарки</h3>
+    {% if gifts %}
+    <div class="gifts-grid">
+      {% for gift in gifts %}
+      <div class="gift-card">
+        <img src="{{ gift.image }}" onerror="this.src='https://via.placeholder.com/100?text=Image+Error'">
+        <div><b>{{ gift.name }}</b></div>
+        <div class="collection-badge">Коллекция #{{ gift.collection_number }}</div>
+        <div>⭐ {{ gift.price }}</div>
+        <div>В наличии: {{ gift.stock }}</div>
+        <button onclick="buyGift({{ gift.gift_id }})">Купить</button>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p>Подарков пока нет в магазине.</p>
+    {% endif %}
+  </div>
+
+  <script>
+    const userId = "{{ user.id }}";
+    function go(path) {
+      window.location.href = path + "?id=" + userId;
+    }
+
+    function buyGift(giftId) {
+      fetch(`/buy/${giftId}?id=${userId}`, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+          alert(data.msg);
+          if (data.success) location.reload();
+        });
+    }
+  </script>
+</body>
+</html>
+'''
+
+MARKET_HTML = '''<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Маркет подарков</title>
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    body { background: #121212; font-family: 'Rubik', sans-serif; color: white; margin: 0; user-select: none; }
+    header { background: #1c1c2b; padding: 16px; text-align: center; font-weight: bold; font-size: 22px; border-bottom: 1px solid #333; }
+    .section { padding: 20px; max-width: 900px; margin: auto; }
+    .balance { font-size: 20px; color: #ffda44; margin-bottom: 20px; }
+    .gifts-grid { display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; }
+    .gift-card { background: #20202f; border-radius: 12px; padding: 16px; width: 160px; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.4); }
+    .gift-card img { width: 100px; height: 100px; object-fit: cover; }
+    .gift-card button { margin-top: 8px; background: #4e70ff; color: white; border: none; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 14px; }
+    .nav { text-align: center; margin: 20px; }
+    .nav-link {
+      color: #4e70ff;
+      cursor: pointer;
+      font-weight: bold;
+      margin: 0 10px;
+      user-select: none;
+      text-decoration: none;
+    }
+    .nav-link:hover { text-decoration: underline; }
+    .collection-badge { background: gold; color: black; padding: 2px 6px; border-radius: 8px; font-size: 10px; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <header>Маркет подарков — ⭐ {{ user.balance }}</header>
+  <div class="nav">
+    <span class="nav-link" onclick="go('/profile')">Профиль</span> |
+    <span class="nav-link" onclick="go('/shop')">Магазин</span> |
+    <span class="nav-link" onclick="go('/market')">Маркет</span>
+    {% if user.is_admin %}
+    | <span class="nav-link" onclick="go('/admin')">Админ-панель</span>
+    {% endif %}
+  </div>
+  <div class="section">
+    <h3>Подарки на маркете</h3>
+    {% if market_items %}
+    <div class="gifts-grid">
+      {% for item in market_items %}
+      <div class="gift-card">
+        <img src="{{ item.gift.image }}" onerror="this.src='https://via.placeholder.com/100?text=Image+Error'">
+        <div><b>{{ item.gift.name }}</b></div>
+        <div class="collection-badge">Коллекция #{{ item.gift.collection_number }}</div>
+        <div>Продавец: {{ item.owner }}</div>
+        <div>⭐ {{ item.price }}</div>
+        <button onclick="buyMarketItem({{ item.market_id }})">Купить</button>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p>Подарков пока нет на маркете.</p>
+    {% endif %}
+  </div>
+
+  <script>
+    const userId = "{{ user.id }}";
+    function go(path) {
+      window.location.href = path + "?id=" + userId;
+    }
+
+    function buyMarketItem(marketId) {
+      fetch(`/market/buy/${marketId}?id=${userId}`, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+          alert(data.msg);
+          if (data.success) location.reload();
         });
     }
   </script>
@@ -427,7 +596,7 @@ ADMIN_HTML = '''<!DOCTYPE html>
     <div class="gifts-grid">
       {% for gift in gifts %}
       <div class="gift-card">
-        <img src="{{ gift.image }}">
+        <img src="{{ gift.image }}" onerror="this.src='https://via.placeholder.com/100?text=Image+Error'">
         <div><b>{{ gift.name }}</b></div>
         <div>Коллекция #{{ gift.collection_number }}</div>
         <div>⭐ {{ gift.price }} | Ост: {{ gift.stock }}</div>
@@ -507,9 +676,6 @@ ADMIN_HTML = '''<!DOCTYPE html>
 </html>
 '''
 
-# Остальные HTML шаблоны (SHOP_HTML, MARKET_HTML) остаются без изменений
-# Добавьте их из предыдущего кода
-
 # --- РОУТЫ ---
 @app.route('/profile')
 def profile():
@@ -521,6 +687,225 @@ def profile():
         return 'Пользователь не найден', 404
     user = user_to_dict(user_row)
     return render_template_string(PROFILE_HTML, user=user)
+
+@app.route('/shop')
+def shop():
+    uid = request.args.get('id')
+    if not uid:
+        return 'UID не указан', 400
+    user_row = get_user_by_uid(uid)
+    if not user_row:
+        return 'Пользователь не найден', 404
+    
+    gifts = get_all_gifts()
+    user = user_to_dict(user_row)
+    return render_template_string(SHOP_HTML, user=user, gifts=gifts)
+
+@app.route('/market')
+def market():
+    uid = request.args.get('id')
+    if not uid:
+        return 'UID не указан', 400
+    user_row = get_user_by_uid(uid)
+    if not user_row:
+        return 'Пользователь не найден', 404
+    
+    market_items = get_market_list()
+    user = user_to_dict(user_row)
+    return render_template_string(MARKET_HTML, user=user, market_items=market_items)
+
+@app.route('/buy/<int:gift_id>', methods=['POST'])
+def buy_gift(gift_id):
+    uid = request.args.get('id')
+    if not uid:
+        return jsonify({'success': False, 'msg': 'UID не указан'})
+    
+    user_row = get_user_by_uid(uid)
+    if not user_row:
+        return jsonify({'success': False, 'msg': 'Пользователь не найден'})
+    
+    gift = get_gift_by_id(gift_id)
+    if not gift:
+        return jsonify({'success': False, 'msg': 'Подарок не найден'})
+    
+    if user_row['balance'] < gift['price']:
+        return jsonify({'success': False, 'msg': 'Недостаточно средств'})
+    
+    if gift['stock'] <= 0:
+        return jsonify({'success': False, 'msg': 'Подарок закончился'})
+    
+    conn = get_db()
+    c = conn.cursor()
+    
+    # Обновляем баланс пользователя
+    new_balance = user_row['balance'] - gift['price']
+    c.execute("UPDATE users SET balance = ? WHERE user_id = ?", (new_balance, user_row['user_id']))
+    
+    # Уменьшаем количество подарков
+    new_stock = gift['stock'] - 1
+    c.execute("UPDATE gifts SET stock = ? WHERE gift_id = ?", (new_stock, gift_id))
+    
+    # Добавляем подарок пользователю
+    c.execute(
+        "INSERT INTO user_gifts (user_id, gift_name, gift_image, date, collection_number) VALUES (?, ?, ?, ?, ?)",
+        (user_row['user_id'], gift['name'], gift['image'], datetime.now().date().isoformat(), gift['collection_number'])
+    )
+    
+    conn.commit()
+    conn.close()
+    
+    return jsonify({'success': True, 'msg': 'Подарок куплен!'})
+
+@app.route('/upgrade/<int:user_gift_id>', methods=['POST'])
+def upgrade_gift(user_gift_id):
+    uid = request.args.get('id')
+    if not uid:
+        return jsonify({'success': False, 'msg': 'UID не указан'})
+    
+    user_row = get_user_by_uid(uid)
+    if not user_row:
+        return jsonify({'success': False, 'msg': 'Пользователь не найден'})
+    
+    user_gift = get_user_gift_by_id(user_gift_id)
+    if not user_gift:
+        return jsonify({'success': False, 'msg': 'Подарок не найден'})
+    
+    if user_gift['updated']:
+        return jsonify({'success': False, 'msg': 'Подарок уже обновлен'})
+    
+    # Получаем информацию о базовом подарке
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT * FROM gifts WHERE name = ?", (user_gift['gift_name'],))
+    base_gift = c.fetchone()
+    
+    if not base_gift or not base_gift['can_upgrade']:
+        return jsonify({'success': False, 'msg': 'Этот подарок нельзя улучшить'})
+    
+    # Получаем доступные улучшения
+    upgrades = get_gift_upgrades(base_gift['gift_id'])
+    if not upgrades:
+        return jsonify({'success': False, 'msg': 'Нет доступных улучшений для этого подарка'})
+    
+    # Выбираем случайное улучшение
+    upgrade = random.choice(upgrades)
+    
+    # Обновляем подарок пользователя
+    c.execute(
+        "UPDATE user_gifts SET gift_name = ?, gift_image = ?, updated = 1 WHERE id = ?",
+        (upgrade['name'], upgrade['image'], user_gift_id)
+    )
+    
+    conn.commit()
+    conn.close()
+    
+    return jsonify({'success': True, 'msg': 'Обновлено'})
+
+@app.route('/market/sell/<int:user_gift_id>', methods=['POST'])
+def sell_to_market(user_gift_id):
+    uid = request.args.get('id')
+    price = request.args.get('price')
+    
+    if not uid:
+        return jsonify({'success': False, 'msg': 'UID не указан'})
+    
+    if not price:
+        return jsonify({'success': False, 'msg': 'Цена не указана'})
+    
+    try:
+        price = int(price)
+        if price < 125 or price > 100000:
+            return jsonify({'success': False, 'msg': 'Цена должна быть от 125 до 100000'})
+    except:
+        return jsonify({'success': False, 'msg': 'Неверная цена'})
+    
+    user_row = get_user_by_uid(uid)
+    if not user_row:
+        return jsonify({'success': False, 'msg': 'Пользователь не найден'})
+    
+    user_gift = get_user_gift_by_id(user_gift_id)
+    if not user_gift:
+        return jsonify({'success': False, 'msg': 'Подарок не найден'})
+    
+    if not user_gift['updated']:
+        return jsonify({'success': False, 'msg': 'Только обновленные подарки можно продавать'})
+    
+    conn = get_db()
+    c = conn.cursor()
+    
+    # Проверяем, не выставлен ли уже этот подарок
+    c.execute("SELECT * FROM market WHERE user_gift_id = ?", (user_gift_id,))
+    existing = c.fetchone()
+    if existing:
+        return jsonify({'success': False, 'msg': 'Этот подарок уже выставлен на маркет'})
+    
+    # Добавляем в маркет
+    c.execute(
+        "INSERT INTO market (owner, user_gift_id, price) VALUES (?, ?, ?)",
+        (user_row['user_id'], user_gift_id, price)
+    )
+    
+    conn.commit()
+    conn.close()
+    
+    return jsonify({'success': True, 'msg': 'Выставлено на маркет'})
+
+@app.route('/market/buy/<int:market_id>', methods=['POST'])
+def buy_from_market(market_id):
+    uid = request.args.get('id')
+    if not uid:
+        return jsonify({'success': False, 'msg': 'UID не указан'})
+    
+    user_row = get_user_by_uid(uid)
+    if not user_row:
+        return jsonify({'success': False, 'msg': 'Пользователь не найден'})
+    
+    conn = get_db()
+    c = conn.cursor()
+    
+    # Получаем информацию о предложении
+    c.execute("SELECT * FROM market WHERE market_id = ?", (market_id,))
+    market_item = c.fetchone()
+    if not market_item:
+        return jsonify({'success': False, 'msg': 'Предложение не найдено'})
+    
+    # Проверяем, не пытается ли пользователь купить свой же подарок
+    if market_item['owner'] == user_row['user_id']:
+        return jsonify({'success': False, 'msg': 'Нельзя купить свой же подарок'})
+    
+    # Проверяем баланс
+    if user_row['balance'] < market_item['price']:
+        return jsonify({'success': False, 'msg': 'Недостаточно средств'})
+    
+    # Получаем информацию о подарке
+    c.execute("SELECT * FROM user_gifts WHERE id = ?", (market_item['user_gift_id'],))
+    user_gift = c.fetchone()
+    if not user_gift:
+        return jsonify({'success': False, 'msg': 'Подарок не найден'})
+    
+    # Получаем информацию о продавце
+    c.execute("SELECT * FROM users WHERE user_id = ?", (market_item['owner'],))
+    seller = c.fetchone()
+    if not seller:
+        return jsonify({'success': False, 'msg': 'Продавец не найден'})
+    
+    # Обновляем балансы
+    new_buyer_balance = user_row['balance'] - market_item['price']
+    new_seller_balance = seller['balance'] + market_item['price']
+    
+    c.execute("UPDATE users SET balance = ? WHERE user_id = ?", (new_buyer_balance, user_row['user_id']))
+    c.execute("UPDATE users SET balance = ? WHERE user_id = ?", (new_seller_balance, seller['user_id']))
+    
+    # Меняем владельца подарка
+    c.execute("UPDATE user_gifts SET user_id = ? WHERE id = ?", (user_row['user_id'], market_item['user_gift_id']))
+    
+    # Удаляем предложение с маркета
+    c.execute("DELETE FROM market WHERE market_id = ?", (market_id,))
+    
+    conn.commit()
+    conn.close()
+    
+    return jsonify({'success': True, 'msg': 'Подарок куплен!'})
 
 @app.route('/admin')
 def admin_panel():
@@ -592,9 +977,6 @@ def admin_give_gift():
     conn.commit()
     conn.close()
     return jsonify({'success': True, 'msg': f'Подарок выдан {data["quantity"]} раз'})
-
-# Остальные роуты (buy_gift, upgrade_gift, market, etc.) остаются без изменений
-# Добавьте их из предыдущего кода
 
 # --- TELEGRAM БОТ ---
 @bot.message_handler(commands=['start'])
