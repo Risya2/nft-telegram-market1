@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Профиль {{ user.name }}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    body { 
+      background: #121212; 
+      font-family: 'Rubik', sans-serif; 
+      color: white; 
+      margin: 0; 
+      user-select: none; 
+    }
+    header { 
+      background: #1c1c2b; 
+      padding: 16px; 
+      text-align: center; 
+      font-weight: bold; 
+      font-size: 22px; 
+      border-bottom: 1px solid #333; 
+    }
+    .section { 
+      padding: 20px; 
+      max-width: 900px; 
+      margin: auto; 
+    }
+    .balance { 
+      font-size: 20px; 
+      color: #ffda44; 
+      margin-bottom: 20px; 
+      text-align: center; 
+    }
+    .gifts-grid { 
+      display: flex; 
+      flex-wrap: wrap; 
+      gap: 15px; 
+      justify-content: center; 
+      margin-top: 20px;
+    }
+    .gift-card { 
+      background: #20202f; 
+      border-radius: 12px; 
+      padding: 16px; 
+      width: 160px; 
+      text-align: center; 
+      box-shadow: 0 4px 10px rgba(0,0,0,0.4); 
+      position: relative; 
+      transition: transform 0.2s;
+    }
+    .gift-card:hover {
+      transform: translateY(-5px);
+    }
+    .gift-card img { 
+      width: 100px; 
+      height: 100px; 
+      object-fit: cover; 
+      border-radius: 8px;
+    }
+    .gift-card button { 
+      margin-top: 8px; 
+      background: #4e70ff; 
+      color: white; 
+      border: none; 
+      padding: 8px 16px; 
+      border-radius: 8px; 
+      cursor: pointer; 
+      font-size: 14px; 
+      width: 100%;
+      transition: background 0.3s;
+    }
+    .gift-card button:hover {
+      background: #3a5bd9;
+    }
+    .nav { 
+      text-align: center; 
+      margin: 20px; 
+      padding: 10px;
+      background: #1c1c2b;
+      border-radius: 10px;
+    }
+    .nav-link {
+      color: #4e70ff;
+      cursor: pointer;
+      font-weight: bold;
+      margin: 0 15px;
+      user-select: none;
+      text-decoration: none;
+      font-size: 16px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      transition: background 0.3s;
+    }
+    .nav-link:hover { 
+      text-decoration: underline;
+      background: rgba(78, 112, 255, 0.1);
+    }
+    .collection-badge { 
+      background: linear-gradient(135deg, #ffda44, #ffb347); 
+      color: black; 
+      padding: 4px 8px; 
+      border-radius: 12px; 
+      font-size: 11px; 
+      margin-top: 8px; 
+      font-weight: bold;
+    }
+    .empty-state {
+      text-align: center;
+      color: #888;
+      font-size: 18px;
+      margin: 40px 0;
+    }
+    .user-info {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .user-avatar {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #4e70ff, #8a2be2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 15px;
+      font-size: 32px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="user-info">
+      <div class="user-avatar">{{ user.name[0] }}</div>
+      <div>{{ user.name }}</div>
+    </div>
+    <div class="balance">⭐ Баланс: {{ user.balance }}</div>
+  </header>
+  
+  <div class="nav">
+    <span class="nav-link" onclick="go('/profile')">📱 Профиль</span>
+    <span class="nav-link" onclick="go('/shop')">🛒 Магазин</span>
+    <span class="nav-link" onclick="go('/market')">🏪 Маркет</span>
+    {% if user.is_admin %}
+    <span class="nav-link" onclick="go('/admin')">⚙️ Админ-панель</span>
+    {% endif %}
+  </div>
+  
+  <div class="section">
+    <h3 style="text-align: center; margin-bottom: 20px;">🎁 Мои подарки</h3>
+    
+    {% if user.gifts %}
+    <div class="gifts-grid">
+      {% for g in user.gifts %}
+      <div class="gift-card">
+        <img src="{{ g.image }}" 
+             onerror="this.src='https://via.placeholder.com/100/20202f/ffffff?text=🎁'" 
+             alt="{{ g.name }}">
+        <div style="font-weight: bold; margin: 8px 0;">{{ g.name }}</div>
+        <div class="collection-badge">Коллекция #{{ g.collection_number }}</div>
+        <div style="font-size:12px; color:#888; margin: 8px 0;">
+          Получен: {{ g.date }}<br>
+          ID: {{ g.id }}
+        </div>
+
+        {% if not g.updated %}
+          <button onclick="upgrade({{ g.id }})">🔄 Обновить</button>
+        {% else %}
+          <div style="font-size:12px; color:#4caf50; margin: 8px 0;">
+            ✅ Обновлено
+          </div>
+          <button onclick="sellToMarket({{ g.id }})">💰 Продать</button>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <div style="font-size: 48px; margin-bottom: 20px;">🎁</div>
+      <div>У вас пока нет подарков</div>
+      <div style="font-size: 14px; margin-top: 10px;">Посетите магазин, чтобы приобрести первый подарок!</div>
+      <button onclick="go('/shop')" style="
+        background: #4e70ff;
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 8px;
+        cursor: pointer;
+        margin-top: 20px;
+        font-size: 16px;
+      ">Перейти в магазин</button>
+    </div>
+    {% endif %}
+  </div>
+
+  <script>
+    const userId = "{{ user.id }}";
+    
+    function go(path) {
+      window.location.href = path + "?id=" + userId;
+    }
+
+    function upgrade(id) {
+      if (confirm('Хотите обновить этот подарок?')) {
+        fetch(`/upgrade/${id}?id=${userId}`, { method: 'POST' })
+          .then(r => r.json())
+          .then(data => {
+            alert(data.msg);
+            if (data.success) {
+              setTimeout(() => location.reload(), 1000);
+            }
+          })
+          .catch(error => {
+            alert('Ошибка при обновлении подарка');
+          });
+      }
+    }
+
+    function sellToMarket(id) {
+      let price = prompt("Введите цену продажи (от 125 до 100000):");
+      
+      if (price === null) return;
+      
+      price = parseInt(price);
+      if (isNaN(price) || price < 125 || price > 100000) {
+        alert("❌ Неверная цена! Введите число от 125 до 100000");
+        return;
+      }
+
+      if (confirm(`Выставить на продажу за ${price} ⭐?`)) {
+        fetch(`/market/sell/${id}?id=${userId}&price=${price}`, { method: 'POST' })
+          .then(r => r.json())
+          .then(data => {
+            alert(data.msg);
+            if (data.success) {
+              setTimeout(() => location.reload(), 1000);
+            }
+          })
+          .catch(error => {
+            alert('Ошибка при выставлении на продажу');
+          });
+      }
+    }
+
+    // Автоматическое обновление баланса каждые 30 секунд
+    setInterval(() => {
+      fetch(`/profile?id=${userId}`)
+        .then(response => response.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(html, 'text/html');
+          const newBalance = doc.querySelector('.balance')?.textContent;
+          if (newBalance) {
+            document.querySelector('.balance').textContent = newBalance;
+          }
+        });
+    }, 30000);
+  </script>
+</body>
+</html>
